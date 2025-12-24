@@ -135,8 +135,7 @@ class CartActivity : AppCompatActivity() {
                     Toast.makeText(this, "Error during checkout: ${error.message}", Toast.LENGTH_LONG).show()
                 } else if (response != null && response.success) {
                     Toast.makeText(this, "Checkout successful! Order ID: ${response.orderId}", Toast.LENGTH_LONG).show()
-                    // Optionally, clear the cart UI or refresh the activity
-                    finish() // Go back to previous screen (e.g., ShopActivity)
+                    finish()
                 } else {
                     Toast.makeText(this, response?.message ?: "Checkout failed", Toast.LENGTH_LONG).show()
                 }

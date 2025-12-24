@@ -1,15 +1,17 @@
-package com.example.personal_stuff
+package com.example.personal_stuff.activities
 
 import android.os.Bundle
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.personal_stuff.R
+import com.example.personal_stuff.adapters.OrderAdapter
 import com.example.personal_stuff.api.ApiClient
 import com.example.personal_stuff.models.Order
 import com.example.personal_stuff.utils.SessionManager
-import com.example.personal_stuff.R
 
 class OrderActivity : AppCompatActivity() {
 
@@ -27,7 +29,8 @@ class OrderActivity : AppCompatActivity() {
         sessionManager = SessionManager(this)
         val user = sessionManager.getUser()
         if (user == null) {
-            finish()
+            Toast.makeText(this, "User data not found", Toast.LENGTH_SHORT).show()
+            finish() // Close the activity if no user is logged in
             return
         }
         userId = user.id
@@ -35,7 +38,7 @@ class OrderActivity : AppCompatActivity() {
         initializeViews()
         apiClient = ApiClient()
 
-        loadOrders()
+        loadOrders() // Fetch orders from the API
         setupClickListeners()
     }
 
@@ -44,16 +47,34 @@ class OrderActivity : AppCompatActivity() {
         btnBack = findViewById(R.id.btnBack)
 
         rvOrders.layoutManager = LinearLayoutManager(this)
-        // rvOrders.adapter = OrderAdapter(orders) // Implement OrderAdapter if needed
+        // rvOrders.adapter will be set after loading orders
     }
 
     private fun loadOrders() {
-        // Placeholder: In a real app, you would have an API endpoint to get orders by user ID.
-        // For now, show a message or implement a mock list if needed.
-        Toast.makeText(this, "Order history functionality would be implemented here.", Toast.LENGTH_LONG).show()
-        // Example mock data if needed:
-        // orders = listOf(Order(...), Order(...))
-        // rvOrders.adapter = OrderAdapter(orders)
+        apiClient.getUserOrders(userId) { ordersList, error ->
+            runOnUiThread {
+                if (error != null) {
+                    Toast.makeText(this, "Error loading orders: ${error.message}", Toast.LENGTH_LONG).show()
+                    // Optionally, handle error differently, e.g., show an empty state or error message in the RecyclerView
+                } else if (ordersList != null) {
+                    orders = ordersList
+                    updateOrderList() // Update the RecyclerView with the fetched orders
+                } else {
+                    // API returned success but no data (shouldn't happen with current API, but good practice)
+                    Toast.makeText(this, "No orders found.", Toast.LENGTH_SHORT).show()
+                    orders = emptyList()
+                    updateOrderList()
+                }
+            }
+        }
+    }
+
+    private fun updateOrderList() {
+        if (orders.isEmpty()) {
+
+        }
+        val adapter = OrderAdapter(orders)
+        rvOrders.adapter = adapter
     }
 
     private fun setupClickListeners() {

@@ -11,8 +11,12 @@ import java.io.IOException
 
 class ApiClient {
     companion object {
-        private const val BASE_URL = "http://10.0.2.2:5079/api/" //POOOORT
-        private val client = OkHttpClient.Builder().addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }).build()
+        private const val BASE_URL = "http://10.0.2.2:5079/api/"
+
+        //private const val BASE_URL = "http://192.168.0.110:5079/api/" //POOOORT
+        private val client = OkHttpClient.Builder().addInterceptor(HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }).build()
     }
 
     fun getAllProducts(callback: (List<Product>?, Throwable?) -> Unit) {
@@ -118,8 +122,10 @@ class ApiClient {
                         try {
                             val jsonObject = JSONObject(body)
                             val success = jsonObject.getBoolean("success")
-                            val message = if (jsonObject.isNull("message")) null else jsonObject.getString("message")
-                            val userObj = if (jsonObject.isNull("user")) null else jsonObject.getJSONObject("user")
+                            val message =
+                                if (jsonObject.isNull("message")) null else jsonObject.getString("message")
+                            val userObj =
+                                if (jsonObject.isNull("user")) null else jsonObject.getJSONObject("user")
                             val user = if (userObj != null) {
                                 User(
                                     id = userObj.getInt("id"),
@@ -168,8 +174,10 @@ class ApiClient {
                         try {
                             val jsonObject = JSONObject(body)
                             val success = jsonObject.getBoolean("success")
-                            val message = if (jsonObject.isNull("message")) null else jsonObject.getString("message")
-                            val userObj = if (jsonObject.isNull("user")) null else jsonObject.getJSONObject("user")
+                            val message =
+                                if (jsonObject.isNull("message")) null else jsonObject.getString("message")
+                            val userObj =
+                                if (jsonObject.isNull("user")) null else jsonObject.getJSONObject("user")
                             val newUser = if (userObj != null) {
                                 User(
                                     id = userObj.getInt("id"),
@@ -231,7 +239,12 @@ class ApiClient {
         })
     }
 
-    fun addToCart(userId: Int, productId: Int, quantity: Int, callback: (String?, Throwable?) -> Unit) {
+    fun addToCart(
+        userId: Int,
+        productId: Int,
+        quantity: Int,
+        callback: (String?, Throwable?) -> Unit
+    ) {
         val request = Request.Builder()
             .url(BASE_URL + "Cart/AddToCart/$userId/$productId/$quantity")
             .post(RequestBody.create(null, "")) // Empty body for POST
@@ -255,7 +268,12 @@ class ApiClient {
         })
     }
 
-    fun updateQuantity(userId: Int, productId: Int, newQuantity: Int, callback: (String?, Throwable?) -> Unit) {
+    fun updateQuantity(
+        userId: Int,
+        productId: Int,
+        newQuantity: Int,
+        callback: (String?, Throwable?) -> Unit
+    ) {
         val request = Request.Builder()
             .url(BASE_URL + "Cart/UpdateQuantity/$userId/$productId/$newQuantity")
             .put(RequestBody.create(null, ""))
@@ -304,10 +322,10 @@ class ApiClient {
         })
     }
 
-    fun checkout(userId: Int, callback: (CheckoutResponse?, Throwable?) -> Unit) {
+    fun getUserOrders(userId: Int, callback: (List<Order>?, Throwable?) -> Unit) {
         val request = Request.Builder()
-            .url(BASE_URL + "Orders/Checkout/$userId")
-            .post(RequestBody.create(null, "")) // Empty body for POST
+            .url(BASE_URL + "Orders/GetUserOrders/$userId") // Use the new endpoint
+            .get()
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -320,13 +338,36 @@ class ApiClient {
                     if (response.isSuccessful) {
                         val body = response.body?.string()
                         try {
-                            val jsonObject = JSONObject(body)
-                            val success = jsonObject.getBoolean("success")
-                            val message = if (jsonObject.isNull("message")) null else jsonObject.getString("message")
-                            val orderId = if (jsonObject.isNull("orderId")) null else jsonObject.getInt("orderId")
-
-                            val checkoutResponse = CheckoutResponse(success, message, orderId)
-                            callback(checkoutResponse, null)
+                            val jsonArray = JSONArray(body)
+                            val orders = mutableListOf<Order>()
+                            for (i in 0 until jsonArray.length()) {
+                                val orderObj = jsonArray.getJSONObject(i)
+                                val orderItemsArray = orderObj.getJSONArray("items")
+                                val orderItems = mutableListOf<OrderItem>()
+                                for (j in 0 until orderItemsArray.length()) {
+                                    val itemObj = orderItemsArray.getJSONObject(j)
+                                    orderItems.add(
+                                        OrderItem(
+                                            productId = itemObj.getInt("productId"),
+                                            quantity = itemObj.getInt("quantity"),
+                                            name = itemObj.getString("name"),
+                                            price = itemObj.getDouble("price"),
+                                            imageUrl = itemObj.getString("imageUrl")
+                                        )
+                                    )
+                                }
+                                val order = Order(
+                                    id = orderObj.getInt("id"),
+                                    userId = orderObj.getInt("userId"),
+                                    items = orderItems,
+                                    totalPrice = orderObj.getDouble("totalPrice"),
+                                    totalQuantity = orderObj.getInt("totalQuantity"),
+                                    orderDate = orderObj.getString("orderDate"),
+                                    status = orderObj.getString("status")
+                                )
+                                orders.add(order)
+                            }
+                            callback(orders, null)
                         } catch (e: Exception) {
                             callback(null, e)
                         }
@@ -337,4 +378,41 @@ class ApiClient {
             }
         })
     }
-}
+        fun checkout(userId: Int, callback: (CheckoutResponse?, Throwable?) -> Unit) {
+            val request = Request.Builder()
+                .url(BASE_URL + "Orders/Checkout/$userId")
+                .post(RequestBody.create(null, "")) // Empty body for POST
+                .build()
+
+            client.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    callback(null, e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use {
+                        if (response.isSuccessful) {
+                            val body = response.body?.string()
+                            try {
+                                val jsonObject = JSONObject(body)
+                                val success = jsonObject.getBoolean("success")
+                                val message =
+                                    if (jsonObject.isNull("message")) null else jsonObject.getString(
+                                        "message"
+                                    )
+                                val orderId =
+                                    if (jsonObject.isNull("orderId")) null else jsonObject.getInt("orderId")
+
+                                val checkoutResponse = CheckoutResponse(success, message, orderId)
+                                callback(checkoutResponse, null)
+                            } catch (e: Exception) {
+                                callback(null, e)
+                            }
+                        } else {
+                            callback(null, IOException("Error: ${response.code}"))
+                        }
+                    }
+                }
+            })
+        }
+    }
